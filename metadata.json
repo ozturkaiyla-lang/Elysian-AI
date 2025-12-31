@@ -1,0 +1,7 @@
+{
+  "name": "Elysian AI",
+  "description": "An empathetic AI emotional therapist providing intelligent guidance on relationships, life transitions, and happiness restoration using advanced Gemini reasoning.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
