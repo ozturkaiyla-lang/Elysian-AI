@@ -156,10 +156,10 @@ const Session: React.FC<{ userProfile?: UserProfile, setProfile: (p: UserProfile
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-12">
         <div className="flex items-center space-x-8 animate-in slide-in-from-left-8 duration-1000">
           <div className="w-20 h-20 rounded-[2rem] bg-black flex items-center justify-center text-white text-2xl font-serif font-bold shadow-2xl uppercase transform hover:rotate-6 transition-transform">
-            {userProfile.name[0]}
+            {userProfile.name ? userProfile.name[0] : '?'}
           </div>
           <div>
-            <h1 className="text-5xl font-serif font-bold text-black tracking-tighter">{userProfile.name}'s Space</h1>
+            <h1 className="text-5xl font-serif font-bold text-black tracking-tighter">{userProfile.name || 'Your'}'s Space</h1>
             <div className="flex items-center mt-3">
               <div className="w-2 h-2 rounded-full bg-black/20 mr-3"></div>
               <p className="text-[11px] text-black/40 font-black uppercase tracking-[0.3em]">Protocol: {userProfile.mainFocus}</p>
@@ -197,8 +197,12 @@ const Session: React.FC<{ userProfile?: UserProfile, setProfile: (p: UserProfile
 
 const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | undefined>(() => {
-    const saved = localStorage.getItem('elysian_profile');
-    return saved ? JSON.parse(saved) : undefined;
+    try {
+      const saved = localStorage.getItem('elysian_profile');
+      return saved ? JSON.parse(saved) : undefined;
+    } catch (e) {
+      return undefined;
+    }
   });
 
   const handleProfileUpdate = (newProfile: UserProfile) => {
