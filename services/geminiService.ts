@@ -18,24 +18,18 @@ export class GeminiService {
   ): Promise<{ text: string; thinking?: string }> {
     try {
       const ai = this.getAI();
-      const model = mode === 'DEEP' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+      // Use the correct Gemini 3 model names as per guidelines
+      const modelName = mode === 'DEEP' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
       
       const namePart = profile?.name ? `The user's name is ${profile.name}. ` : "";
-      const focusPart = profile?.mainFocus ? `Their primary concern or focus for today is: ${profile.mainFocus}. ` : "";
-      const contextPart = profile?.context ? `Additional context about their life: ${profile.context}. ` : "";
+      const focusPart = profile?.mainFocus ? `Their primary concern is: ${profile.mainFocus}. ` : "";
+      const contextPart = profile?.context ? `Context: ${profile.context}. ` : "";
 
-      const config: any = {
-        systemInstruction: `You are Elysian, a world-class AI emotional therapist. 
+      const systemInstruction = `You are Elysian, a world-class AI emotional therapist. 
         Your tone is empathetic, professional, gentle, and deeply insightful. 
         ${namePart}${focusPart}${contextPart}
         You specialize in healing broken relationships, providing marriage counseling, and helping users find happiness in difficult life transitions.
-        When in DEEP mode, you should use your complex reasoning to understand the underlying psychological patterns.
-        When providing advice, be actionable but non-judgmental. Always address the user warmly.`,
-      };
-
-      if (mode === 'DEEP') {
-        config.thinkingConfig = { thinkingBudget: 32768 };
-      }
+        When providing advice, be actionable but non-judgmental. Always address the user warmly.`;
 
       const contents = [
         ...history.map(h => ({
@@ -45,19 +39,32 @@ export class GeminiService {
         { role: 'user', parts: [{ text: message }] }
       ];
 
+      const config: any = {
+        systemInstruction,
+      };
+
+      if (mode === 'DEEP') {
+        config.thinkingConfig = { thinkingBudget: 32768 };
+      }
+
       const response = await ai.models.generateContent({
-        model,
+        model: modelName,
         contents,
         config,
       });
 
+      const text = response.text;
+      if (!text) {
+        throw new Error("Empty response from AI");
+      }
+
       return {
-        text: response.text || "I'm here for you, but I encountered a small ripple in the connection. Could you repeat that?",
+        text: text,
         thinking: (response as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought
       };
     } catch (error: any) {
       console.error("Gemini API Error:", error);
-      if (error.message?.includes("Requested entity was not found") || error.message === "API_KEY_MISSING") {
+      if (error.message?.includes("API_KEY_MISSING") || error.message?.includes("403")) {
         throw new Error("KEY_RESET_REQUIRED");
       }
       throw error;
@@ -69,7 +76,7 @@ export class GeminiService {
       const ai = this.getAI();
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Say cheerfully and empathetically: ${text}` }] }],
+        contents: [{ parts: [{ text: `Say with deep empathy: ${text}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
