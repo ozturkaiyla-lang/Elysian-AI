@@ -1,10 +1,13 @@
-
 import { GoogleGenAI, Modality, Type, GenerateContentResponse } from "@google/genai";
 import { UserProfile } from "../types";
 
 export class GeminiService {
   private getAI() {
-    return new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error("API_KEY_MISSING");
+    }
+    return new GoogleGenAI({ apiKey });
   }
 
   async getChatResponse(
@@ -13,35 +16,35 @@ export class GeminiService {
     mode: 'FAST' | 'DEEP',
     profile?: UserProfile
   ): Promise<{ text: string; thinking?: string }> {
-    const ai = this.getAI();
-    const model = mode === 'DEEP' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
-    
-    const namePart = profile?.name ? `The user's name is ${profile.name}. ` : "";
-    const focusPart = profile?.mainFocus ? `Their primary concern or focus for today is: ${profile.mainFocus}. ` : "";
-    const contextPart = profile?.context ? `Additional context about their life: ${profile.context}. ` : "";
-
-    const config: any = {
-      systemInstruction: `You are Elysian, a world-class AI emotional therapist. 
-      Your tone is empathetic, professional, gentle, and deeply insightful. 
-      ${namePart}${focusPart}${contextPart}
-      You specialize in healing broken relationships, providing marriage counseling, and helping users find happiness in difficult life transitions.
-      When in DEEP mode, you should use your complex reasoning to understand the underlying psychological patterns.
-      When providing advice, be actionable but non-judgmental. Always address the user warmly.`,
-    };
-
-    if (mode === 'DEEP') {
-      config.thinkingConfig = { thinkingBudget: 32768 };
-    }
-
-    const contents = [
-      ...history.map(h => ({
-        role: h.role === 'user' ? 'user' : 'model',
-        parts: [{ text: h.content }]
-      })),
-      { role: 'user', parts: [{ text: message }] }
-    ];
-
     try {
+      const ai = this.getAI();
+      const model = mode === 'DEEP' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+      
+      const namePart = profile?.name ? `The user's name is ${profile.name}. ` : "";
+      const focusPart = profile?.mainFocus ? `Their primary concern or focus for today is: ${profile.mainFocus}. ` : "";
+      const contextPart = profile?.context ? `Additional context about their life: ${profile.context}. ` : "";
+
+      const config: any = {
+        systemInstruction: `You are Elysian, a world-class AI emotional therapist. 
+        Your tone is empathetic, professional, gentle, and deeply insightful. 
+        ${namePart}${focusPart}${contextPart}
+        You specialize in healing broken relationships, providing marriage counseling, and helping users find happiness in difficult life transitions.
+        When in DEEP mode, you should use your complex reasoning to understand the underlying psychological patterns.
+        When providing advice, be actionable but non-judgmental. Always address the user warmly.`,
+      };
+
+      if (mode === 'DEEP') {
+        config.thinkingConfig = { thinkingBudget: 32768 };
+      }
+
+      const contents = [
+        ...history.map(h => ({
+          role: h.role === 'user' ? 'user' : 'model',
+          parts: [{ text: h.content }]
+        })),
+        { role: 'user', parts: [{ text: message }] }
+      ];
+
       const response = await ai.models.generateContent({
         model,
         contents,
@@ -53,7 +56,8 @@ export class GeminiService {
         thinking: (response as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought
       };
     } catch (error: any) {
-      if (error.message?.includes("Requested entity was not found")) {
+      console.error("Gemini API Error:", error);
+      if (error.message?.includes("Requested entity was not found") || error.message === "API_KEY_MISSING") {
         throw new Error("KEY_RESET_REQUIRED");
       }
       throw error;
@@ -61,11 +65,11 @@ export class GeminiService {
   }
 
   async generateTTS(text: string): Promise<Uint8Array | null> {
-    const ai = this.getAI();
     try {
+      const ai = this.getAI();
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Speak this empathetically: ${text}` }] }],
+        contents: [{ parts: [{ text: `Say cheerfully and empathetically: ${text}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -98,12 +102,16 @@ export class GeminiService {
   }
 
   async playAudio(data: Uint8Array) {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-    const audioBuffer = await this.decodeAudioData(data, ctx, 24000, 1);
-    const source = ctx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(ctx.destination);
-    source.start();
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      const audioBuffer = await this.decodeAudioData(data, ctx, 24000, 1);
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      source.start();
+    } catch (e) {
+      console.error("Audio playback error:", e);
+    }
   }
 
   private async decodeAudioData(

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, SessionMode, UserProfile } from '../types';
 import { gemini } from '../services/geminiService';
@@ -113,7 +112,6 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
       }
     ]);
 
-    // Initialize Speech Recognition
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
@@ -133,7 +131,6 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
       };
 
       recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error);
         setIsListening(false);
       };
 
@@ -209,14 +206,14 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (err: any) {
-      console.error(err);
+      console.error("Chat Send Error:", err);
       if (err.message === "KEY_RESET_REQUIRED") {
-        setError("Your API key configuration needs adjustment for this model.");
+        setError("API configuration needs adjustment. Please ensure a valid API key is selected.");
         if ((window as any).aistudio?.openSelectKey) {
           (window as any).aistudio.openSelectKey();
         }
       } else {
-        setError("Connection issue detected. I'm still here, please try sending that again.");
+        setError("I'm having trouble connecting to my neural core. Please check your internet and try again.");
       }
     } finally {
       setIsLoading(false);
@@ -224,17 +221,22 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
   };
 
   const speakMessage = async (text: string) => {
+    if (isPlaying) return;
     setIsPlaying(true);
-    const audio = await gemini.generateTTS(text);
-    if (audio) {
-      await gemini.playAudio(audio);
+    try {
+      const audio = await gemini.generateTTS(text);
+      if (audio) {
+        await gemini.playAudio(audio);
+      }
+    } catch (e) {
+      console.error("TTS play error:", e);
+    } finally {
+      setIsPlaying(false);
     }
-    setIsPlaying(false);
   };
 
   return (
     <div className="flex flex-col h-full glass-panel rounded-[3rem] shadow-2xl overflow-hidden relative border border-white/40">
-      {/* Mode Indicator */}
       <div className="px-10 py-5 bg-white/40 backdrop-blur-xl border-b border-white/20 flex justify-between items-center z-10">
         <div className="flex items-center space-x-4">
           <div className="relative">
@@ -253,7 +255,6 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
         )}
       </div>
 
-      {/* Messages Viewport */}
       <div 
         ref={scrollRef}
         className="flex-1 overflow-y-auto px-8 py-10 space-y-12 custom-scrollbar scroll-smooth"
@@ -261,34 +262,23 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
         {messages.map((msg) => (
           <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
             <div className={`max-w-[75%] group flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              
-              {/* Thinking State */}
               {msg.thinking && (
                 <div className="mb-6 relative w-full">
                   <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-12 bg-indigo-500/20 rounded-full"></div>
-                  <div className="p-7 bg-gradient-to-br from-indigo-50/50 to-white/30 rounded-[2.5rem] text-[14px] text-indigo-950 border border-indigo-100 backdrop-blur-xl shadow-inner transition-all">
+                  <div className="p-7 bg-gradient-to-br from-indigo-50/50 to-white/30 rounded-[2.5rem] text-[14px] text-indigo-950 border border-indigo-100 backdrop-blur-xl shadow-inner">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center text-indigo-600 font-black uppercase tracking-[0.25em] text-[8px]">
                         <i className="fa-solid fa-brain-circuit mr-2"></i>
                         AI Path of Reason
                       </div>
-                      <div className="flex gap-1">
-                        {[1, 2, 3].map(i => <div key={i} className="w-1 h-1 rounded-full bg-indigo-200"></div>)}
-                      </div>
                     </div>
                     <p className="italic leading-relaxed font-serif opacity-90 text-indigo-900/80">
                       {msg.thinking}
                     </p>
-                    <div className="mt-4 flex items-center gap-3 opacity-20">
-                      <div className="h-px flex-1 bg-indigo-900"></div>
-                      <i className="fa-solid fa-microchip text-[8px]"></i>
-                      <div className="h-px flex-1 bg-indigo-900"></div>
-                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Chat Bubble */}
               <div className={`relative flex items-end gap-4 transition-all duration-500 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                 {msg.role === 'assistant' && (
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-zen-900 to-black flex items-center justify-center flex-shrink-0 shadow-2xl shadow-zen-950/20 transform hover:scale-110 transition-transform">
@@ -320,7 +310,6 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
                 </div>
               </div>
 
-              {/* Timestamp */}
               <div className={`mt-4 px-2 text-[10px] font-black uppercase tracking-[0.3em] text-zen-900/40 ${msg.role === 'user' ? 'text-right' : 'text-left ml-16'}`}>
                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
@@ -340,7 +329,6 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
         )}
       </div>
 
-      {/* Visible Input Area */}
       <div className="p-10 bg-gradient-to-t from-white/20 to-transparent">
         <div className="max-w-4xl mx-auto relative group">
           <div className="absolute -inset-2 bg-white/40 rounded-[3rem] blur-2xl opacity-0 group-focus-within:opacity-100 transition duration-1000"></div>
