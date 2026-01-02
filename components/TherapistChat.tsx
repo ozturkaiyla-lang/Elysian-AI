@@ -130,13 +130,8 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
         }
       };
 
-      recognitionRef.current.onerror = (event: any) => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+      recognitionRef.current.onerror = () => setIsListening(false);
+      recognitionRef.current.onend = () => setIsListening(false);
     }
   }, [profile]);
 
@@ -154,10 +149,8 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
       setError("Voice recognition is not supported in this browser.");
       return;
     }
-
     if (isListening) {
       recognitionRef.current.stop();
-      setIsListening(false);
     } else {
       try {
         recognitionRef.current.start();
@@ -208,12 +201,11 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
     } catch (err: any) {
       console.error("Chat Send Error:", err);
       if (err.message === "KEY_RESET_REQUIRED") {
-        setError("I need a valid connection to provide deep reflection. Please ensure your API key is correctly configured.");
+        setError("Connection required for deep reflection. Opening setup...");
         if ((window as any).aistudio?.openSelectKey) {
-          (window as any).aistudio.openSelectKey().then(() => {
-            // After key selection, we can't reliably know if it worked, but we prompt user to try again
-            setError("Configuration updated. Please try your message again.");
-          });
+          await (window as any).aistudio.openSelectKey();
+          // Instructions: assume key selection successful and guide user to try again
+          setError("Configuration updated. Please try your message one more time.");
         }
       } else {
         setError("I'm having trouble connecting to my restorative core. Please check your internet and try again.");

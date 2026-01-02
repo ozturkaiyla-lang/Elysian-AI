@@ -5,9 +5,10 @@ export class GeminiService {
   private getAI() {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
+      console.error("API_KEY is not defined in the environment.");
       throw new Error("API_KEY_MISSING");
     }
-    // Always create a new instance to pick up potential key changes
+    // Create fresh instance to ensure connectivity
     return new GoogleGenAI({ apiKey });
   }
 
@@ -64,8 +65,13 @@ export class GeminiService {
       };
     } catch (error: any) {
       console.error("Gemini API Error:", error);
-      // Catch common key errors
-      if (error.message?.includes("API_KEY_MISSING") || error.message?.includes("403") || error.message?.includes("not found")) {
+      // Catch common key/connection errors
+      if (
+        error.message?.includes("API_KEY_MISSING") || 
+        error.message?.includes("403") || 
+        error.message?.includes("not found") ||
+        error.message?.includes("API key")
+      ) {
         throw new Error("KEY_RESET_REQUIRED");
       }
       throw error;
