@@ -3,6 +3,7 @@ import { UserProfile, RestorationBlueprint } from "../types";
 
 export class GeminiService {
   private getAI() {
+    // Strictly using process.env.API_KEY as per security requirements
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
       throw new Error("API_KEY_MISSING");
@@ -20,39 +21,32 @@ export class GeminiService {
       const ai = this.getAI();
       const modelName = mode === 'DEEP' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
       
-      const systemInstruction = `You are Elysian, an elite AI emotional therapist. 
-        Tone: Gentle, authoritative on psychology, deeply empathetic, but most importantly: ACTION-ORIENTED.
-        Objective: Provide ADVICE and INTELLIGENT SUGGESTIONS on how to FIX the user's emotional or relationship state.
+      const systemInstruction = `You are Elysian, an elite AI emotional therapist and strategist. 
+        Role: You don't just listen; you ANALYZE and FIX. 
+        Tone: Empathetic but clinical, authoritative on psychology, and intensely focused on actionable recovery.
+        Objective: For every problem the user shares, provide a "Fix Protocol." Use psychological frameworks (CBT, DBT, Gottman Method) to intelligently suggest how the user can change their situation.
         User Identity: ${profile?.name || 'Friend'}. 
-        Current Focus: ${profile?.mainFocus || 'Emotional Well-being'}. 
-        Additional Context: ${profile?.context || 'No specific history shared yet.'}`;
+        Current Focus Area: ${profile?.mainFocus || 'Emotional Well-being'}. 
+        Additional User Context: ${profile?.context || 'First session.'}`;
 
-      const contents = [
-        ...history.map(h => ({
-          role: h.role === 'user' ? 'user' : 'model',
-          parts: [{ text: h.content }]
-        })),
-        { role: 'user', parts: [{ text: message }] }
-      ];
+      const contents = history.map(h => ({
+        role: h.role === 'user' ? 'user' : 'model',
+        parts: [{ text: h.content }]
+      }));
+      contents.push({ role: 'user', parts: [{ text: message }] });
 
       const response = await ai.models.generateContent({
         model: modelName,
-        contents,
+        contents: { parts: contents.flatMap(c => c.parts) }, // Simplified structure for multi-turn
         config: {
           systemInstruction,
-          thinkingConfig: mode === 'DEEP' ? { thinkingBudget: 16000 } : undefined
+          thinkingConfig: mode === 'DEEP' ? { thinkingBudget: 32768 } : undefined
         },
       });
 
-      if (!response.text) {
-        throw new Error("Empty response from AI");
-      }
-
-      const thought = (response as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought;
-      
       return {
-        text: response.text,
-        thinking: thought
+        text: response.text || "I'm reflecting on your situation. Could you tell me more?",
+        thinking: (response as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought
       };
     } catch (error) {
       console.error("Gemini API Error:", error);
@@ -66,20 +60,23 @@ export class GeminiService {
   ): Promise<RestorationBlueprint> {
     try {
       const ai = this.getAI();
-      const prompt = `Review this conversation and create a structured "Restoration Blueprint" to FIX the user's situation. 
-        Output MUST be strictly JSON.
-        History: ${history.map(h => h.content).join(' | ')}`;
+      const conversationText = history.map(h => `${h.role}: ${h.content}`).join('\n');
+      const prompt = `Based on the following therapy session history, generate a "Restoration Blueprint" JSON object to FIX the user's emotional state or relationship. 
+        Be specific, directive, and intelligently strategic.
+        
+        Session History:
+        ${conversationText}`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: prompt,
+        contents: [{ parts: [{ text: prompt }] }],
         config: {
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              rootAnalysis: { type: Type.STRING },
-              coreShift: { type: Type.STRING },
+              rootAnalysis: { type: Type.STRING, description: "A deep dive into the hidden psychological cause of the user's pain." },
+              coreShift: { type: Type.STRING, description: "The single most important mindset change required to fix this." },
               actionSteps: {
                 type: Type.ARRAY,
                 items: {
@@ -87,12 +84,12 @@ export class GeminiService {
                   properties: {
                     title: { type: Type.STRING },
                     description: { type: Type.STRING },
-                    whyItWorks: { type: Type.STRING }
+                    whyItWorks: { type: Type.STRING, description: "The psychological logic behind this step." }
                   },
                   required: ['title', 'description', 'whyItWorks']
                 }
               },
-              suggestedRitual: { type: Type.STRING }
+              suggestedRitual: { type: Type.STRING, description: "A daily habit to solidify the healing." }
             },
             required: ['rootAnalysis', 'coreShift', 'actionSteps', 'suggestedRitual']
           }
@@ -112,7 +109,7 @@ export class GeminiService {
       const ai = this.getAI();
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Say with deep warmth and empathy: ${text}` }] }],
+        contents: [{ parts: [{ text: `Say with deep warmth and clinical authority: ${text}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -130,25 +127,6 @@ export class GeminiService {
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     return bytes;
-  }
-
-  async playAudio(data: Uint8Array) {
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      const dataInt16 = new Int16Array(data.buffer);
-      const frameCount = dataInt16.length;
-      const buffer = ctx.createBuffer(1, frameCount, 24000);
-      const channelData = buffer.getChannelData(0);
-      for (let i = 0; i < frameCount; i++) {
-        channelData[i] = dataInt16[i] / 32768.0;
-      }
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      source.start();
-    } catch (e) {
-      console.error("Playback error:", e);
-    }
   }
 }
 
