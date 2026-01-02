@@ -7,6 +7,7 @@ export class GeminiService {
     if (!apiKey) {
       throw new Error("API_KEY_MISSING");
     }
+    // Always create a new instance to pick up potential key changes
     return new GoogleGenAI({ apiKey });
   }
 
@@ -18,17 +19,17 @@ export class GeminiService {
   ): Promise<{ text: string; thinking?: string }> {
     try {
       const ai = this.getAI();
-      // Use the correct Gemini 3 model names as per guidelines
-      const modelName = mode === 'DEEP' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+      const model = mode === 'DEEP' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
       
       const namePart = profile?.name ? `The user's name is ${profile.name}. ` : "";
-      const focusPart = profile?.mainFocus ? `Their primary concern is: ${profile.mainFocus}. ` : "";
-      const contextPart = profile?.context ? `Context: ${profile.context}. ` : "";
+      const focusPart = profile?.mainFocus ? `Their primary concern today is: ${profile.mainFocus}. ` : "";
+      const contextPart = profile?.context ? `Additional Context: ${profile.context}. ` : "";
 
       const systemInstruction = `You are Elysian, a world-class AI emotional therapist. 
         Your tone is empathetic, professional, gentle, and deeply insightful. 
         ${namePart}${focusPart}${contextPart}
         You specialize in healing broken relationships, providing marriage counseling, and helping users find happiness in difficult life transitions.
+        When mode is DEEP, you provide profound, analytical psychological insights.
         When providing advice, be actionable but non-judgmental. Always address the user warmly.`;
 
       const contents = [
@@ -48,23 +49,23 @@ export class GeminiService {
       }
 
       const response = await ai.models.generateContent({
-        model: modelName,
+        model,
         contents,
         config,
       });
 
-      const text = response.text;
-      if (!text) {
-        throw new Error("Empty response from AI");
+      if (!response || !response.text) {
+        throw new Error("I apologize, but I couldn't form a response. Please try sharing your thoughts again.");
       }
 
       return {
-        text: text,
+        text: response.text,
         thinking: (response as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought
       };
     } catch (error: any) {
       console.error("Gemini API Error:", error);
-      if (error.message?.includes("API_KEY_MISSING") || error.message?.includes("403")) {
+      // Catch common key errors
+      if (error.message?.includes("API_KEY_MISSING") || error.message?.includes("403") || error.message?.includes("not found")) {
         throw new Error("KEY_RESET_REQUIRED");
       }
       throw error;
@@ -76,7 +77,7 @@ export class GeminiService {
       const ai = this.getAI();
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Say with deep empathy: ${text}` }] }],
+        contents: [{ parts: [{ text: `Say with deep, gentle empathy: ${text}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {

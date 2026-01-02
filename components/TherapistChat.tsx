@@ -208,12 +208,15 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
     } catch (err: any) {
       console.error("Chat Send Error:", err);
       if (err.message === "KEY_RESET_REQUIRED") {
-        setError("API configuration needs adjustment. Please ensure a valid API key is selected.");
+        setError("I need a valid connection to provide deep reflection. Please ensure your API key is correctly configured.");
         if ((window as any).aistudio?.openSelectKey) {
-          (window as any).aistudio.openSelectKey();
+          (window as any).aistudio.openSelectKey().then(() => {
+            // After key selection, we can't reliably know if it worked, but we prompt user to try again
+            setError("Configuration updated. Please try your message again.");
+          });
         }
       } else {
-        setError("I'm having trouble connecting to my neural core. Please check your internet and try again.");
+        setError("I'm having trouble connecting to my restorative core. Please check your internet and try again.");
       }
     } finally {
       setIsLoading(false);
@@ -321,7 +324,7 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
 
         {error && (
           <div className="flex justify-center p-8 animate-in zoom-in-95 duration-300">
-            <div className="bg-white/90 backdrop-blur-xl text-red-600 px-8 py-4 rounded-3xl text-[12px] font-black uppercase tracking-[0.25em] flex items-center border border-red-100 shadow-2xl shadow-red-200/40">
+            <div className="bg-white/90 backdrop-blur-xl text-red-600 px-8 py-4 rounded-3xl text-[12px] font-black uppercase tracking-[0.25em] flex items-center border border-red-100 shadow-2xl shadow-red-200/40 text-center">
               <i className="fa-solid fa-triangle-exclamation mr-4 text-red-500 text-lg"></i>
               {error}
             </div>
