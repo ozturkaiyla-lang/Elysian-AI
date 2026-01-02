@@ -154,7 +154,7 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
       if (err.message === "API_KEY_MISSING") {
         setError("AUTHENTICATION FAILED: PLEASE CONFIGURE THE API_KEY IN VERCEL SETTINGS.");
       } else {
-        setError("I'M HAVING TROUBLE CONNECTING TO MY RESTORATIVE CORE. PLEASE CHECK YOUR API KEY CONFIGURATION.");
+        setError("CONNECTION ERROR: PLEASE ENSURE YOUR VERCEL ENVIRONMENT VARIABLES ARE CONFIGURED CORRECTLY.");
       }
     } finally {
       setIsLoading(false);
@@ -230,13 +230,13 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
           <div className="flex items-center gap-4 bg-white/95 p-6 rounded-3xl border border-red-100 shadow-2xl text-red-600 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-2">
             <i className="fa-solid fa-triangle-exclamation text-xl"></i>
             <span className="text-[11px] font-black uppercase tracking-[0.2em] text-center flex-1">{error}</span>
-            <button onClick={() => window.location.reload()} className="text-[9px] font-black underline uppercase tracking-widest text-red-400 hover:text-red-700">Try Again</button>
+            <button onClick={() => window.location.reload()} className="text-[9px] font-black underline uppercase tracking-widest text-red-400 hover:text-red-700">Fix Connection</button>
           </div>
         )}
       </div>
 
       <div className="p-6 bg-white/30 backdrop-blur-xl border-t border-white/20">
-        <div className="max-w-4xl mx-auto flex items-center gap-3 bg-white p-2 rounded-full shadow-xl border border-zen-50 overflow-hidden">
+        <div className="max-w-4xl mx-auto flex items-center gap-3 bg-white p-2 rounded-full shadow-xl border border-zen-200 overflow-hidden">
           <button 
             onClick={toggleListening}
             className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-zen-50 text-zen-300 hover:text-zen-600'}`}
@@ -248,13 +248,13 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Share what's on your mind..."
-            className="flex-1 bg-transparent px-4 py-2 focus:outline-none text-[15px] text-zen-950 font-medium"
+            placeholder="Type your thoughts here..."
+            className="flex-1 bg-white px-4 py-2 focus:outline-none text-[16px] text-black font-medium placeholder:text-zinc-400"
           />
           <button 
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="w-12 h-12 bg-zen-950 text-white rounded-full flex items-center justify-center disabled:opacity-20 hover:scale-105 active:scale-95 transition-all"
+            className="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center disabled:opacity-20 hover:scale-105 active:scale-95 transition-all"
           >
             <i className="fa-solid fa-arrow-up"></i>
           </button>
