@@ -70,7 +70,6 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blueprint, setBlueprint] = useState<RestorationBlueprint | null>(() => {
@@ -147,11 +146,15 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
 
       setMessages(prev => [...prev, assistantMsg]);
 
+      // Logic: Update blueprint after enough context
       if (messages.length >= 2) {
         updateBlueprint([...messages, userMsg, assistantMsg]);
       }
-    } catch (err) {
-      setError("I'm having trouble connecting to my restorative core. Please try again.");
+    } catch (err: any) {
+      const errorMsg = err.message === "API_KEY_MISSING" 
+        ? "Configuration missing: Please set your API_KEY in the environment."
+        : "Connection lost. Please check your network and try again.";
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }

@@ -3,9 +3,10 @@ import { UserProfile, RestorationBlueprint } from "../types";
 
 export class GeminiService {
   private getAI() {
-    // Strictly using process.env.API_KEY as per security requirements
+    // Strictly using process.env.API_KEY as provided by Vercel environment
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
+      console.error("CRITICAL: API_KEY is missing from environment variables.");
       throw new Error("API_KEY_MISSING");
     }
     return new GoogleGenAI({ apiKey });
@@ -29,15 +30,18 @@ export class GeminiService {
         Current Focus Area: ${profile?.mainFocus || 'Emotional Well-being'}. 
         Additional User Context: ${profile?.context || 'First session.'}`;
 
-      const contents = history.map(h => ({
-        role: h.role === 'user' ? 'user' : 'model',
-        parts: [{ text: h.content }]
-      }));
-      contents.push({ role: 'user', parts: [{ text: message }] });
+      // Corrected: Contents must be an array of objects with role and parts
+      const contents = [
+        ...history.map(h => ({
+          role: h.role === 'user' ? 'user' : 'model',
+          parts: [{ text: h.content }]
+        })),
+        { role: 'user', parts: [{ text: message }] }
+      ];
 
       const response = await ai.models.generateContent({
         model: modelName,
-        contents: { parts: contents.flatMap(c => c.parts) }, // Simplified structure for multi-turn
+        contents,
         config: {
           systemInstruction,
           thinkingConfig: mode === 'DEEP' ? { thinkingBudget: 32768 } : undefined
@@ -49,7 +53,7 @@ export class GeminiService {
         thinking: (response as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought
       };
     } catch (error) {
-      console.error("Gemini API Error:", error);
+      console.error("Gemini API Connection Error:", error);
       throw error;
     }
   }
@@ -69,7 +73,7 @@ export class GeminiService {
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: {
           responseMimeType: 'application/json',
           responseSchema: {
@@ -109,7 +113,7 @@ export class GeminiService {
       const ai = this.getAI();
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Say with deep warmth and clinical authority: ${text}` }] }],
+        contents: [{ role: 'user', parts: [{ text: `Speak with clinical empathy and deep warmth: ${text}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
