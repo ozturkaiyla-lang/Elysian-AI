@@ -3,12 +3,18 @@ import { UserProfile, RestorationBlueprint } from "../types";
 
 export class GeminiService {
   private getAI() {
-    // Strictly using process.env.API_KEY as provided by Vercel environment
-    const apiKey = process.env.API_KEY;
+    let apiKey = process.env.API_KEY?.trim();
+    
+    // Support keys that were pasted with the "API" label prefix
+    if (apiKey?.startsWith('APIAIzaSy')) {
+      apiKey = apiKey.substring(3);
+    }
+
     if (!apiKey) {
-      console.error("CRITICAL: API_KEY is missing from environment variables.");
+      console.error("GeminiService: API_KEY is missing from environment variables.");
       throw new Error("API_KEY_MISSING");
     }
+    
     return new GoogleGenAI({ apiKey });
   }
 
@@ -23,37 +29,35 @@ export class GeminiService {
       const modelName = mode === 'DEEP' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
       
       const systemInstruction = `You are Elysian, an elite AI emotional therapist and strategist. 
-        Role: You don't just listen; you ANALYZE and FIX. 
-        Tone: Empathetic but clinical, authoritative on psychology, and intensely focused on actionable recovery.
-        Objective: For every problem the user shares, provide a "Fix Protocol." Use psychological frameworks (CBT, DBT, Gottman Method) to intelligently suggest how the user can change their situation.
-        User Identity: ${profile?.name || 'Friend'}. 
-        Current Focus Area: ${profile?.mainFocus || 'Emotional Well-being'}. 
-        Additional User Context: ${profile?.context || 'First session.'}`;
+        Role: You are a "fixer." You don't just validate feelings; you analyze psychological bottlenecks and provide concrete "Fix Protocols."
+        Frameworks: Use CBT, DBT, and high-level reasoning to suggest intelligent changes to the user's situation.
+        Identity: Address the user as ${profile?.name || 'Friend'}. 
+        Focus: ${profile?.mainFocus || 'General well-being'}. 
+        Context: ${profile?.context || 'No additional context.'}`;
 
-      // Corrected: Contents must be an array of objects with role and parts
-      const contents = [
-        ...history.map(h => ({
-          role: h.role === 'user' ? 'user' : 'model',
-          parts: [{ text: h.content }]
-        })),
-        { role: 'user', parts: [{ text: message }] }
-      ];
+      const contents = history.map(h => ({
+        role: h.role === 'user' ? 'user' : 'model',
+        parts: [{ text: h.content }]
+      }));
+      
+      contents.push({ role: 'user', parts: [{ text: message }] });
 
       const response = await ai.models.generateContent({
         model: modelName,
         contents,
         config: {
           systemInstruction,
-          thinkingConfig: mode === 'DEEP' ? { thinkingBudget: 32768 } : undefined
+          thinkingConfig: mode === 'DEEP' ? { thinkingBudget: 32768 } : undefined,
+          temperature: 0.7,
         },
       });
 
-      return {
-        text: response.text || "I'm reflecting on your situation. Could you tell me more?",
-        thinking: (response as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought
-      };
-    } catch (error) {
-      console.error("Gemini API Connection Error:", error);
+      const text = response.text || "I'm listening and reflecting. Tell me more.";
+      const thinking = (response as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought;
+
+      return { text, thinking };
+    } catch (error: any) {
+      console.error("Gemini Connection Error:", error);
       throw error;
     }
   }
@@ -65,10 +69,7 @@ export class GeminiService {
     try {
       const ai = this.getAI();
       const conversationText = history.map(h => `${h.role}: ${h.content}`).join('\n');
-      const prompt = `Based on the following therapy session history, generate a "Restoration Blueprint" JSON object to FIX the user's emotional state or relationship. 
-        Be specific, directive, and intelligently strategic.
-        
-        Session History:
+      const prompt = `Synthesize a "Restoration Blueprint" JSON for the user based on our therapy session:
         ${conversationText}`;
 
       const response = await ai.models.generateContent({
@@ -79,8 +80,8 @@ export class GeminiService {
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              rootAnalysis: { type: Type.STRING, description: "A deep dive into the hidden psychological cause of the user's pain." },
-              coreShift: { type: Type.STRING, description: "The single most important mindset change required to fix this." },
+              rootAnalysis: { type: Type.STRING },
+              coreShift: { type: Type.STRING },
               actionSteps: {
                 type: Type.ARRAY,
                 items: {
@@ -88,22 +89,21 @@ export class GeminiService {
                   properties: {
                     title: { type: Type.STRING },
                     description: { type: Type.STRING },
-                    whyItWorks: { type: Type.STRING, description: "The psychological logic behind this step." }
+                    whyItWorks: { type: Type.STRING }
                   },
                   required: ['title', 'description', 'whyItWorks']
                 }
               },
-              suggestedRitual: { type: Type.STRING, description: "A daily habit to solidify the healing." }
+              suggestedRitual: { type: Type.STRING }
             },
             required: ['rootAnalysis', 'coreShift', 'actionSteps', 'suggestedRitual']
           }
         }
       });
 
-      const blueprint = JSON.parse(response.text || '{}');
-      return { ...blueprint, lastUpdated: Date.now() };
+      return JSON.parse(response.text || '{}');
     } catch (error) {
-      console.error("Blueprint generation failed:", error);
+      console.error("Blueprint synthesis failed:", error);
       throw error;
     }
   }
@@ -113,7 +113,7 @@ export class GeminiService {
       const ai = this.getAI();
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ role: 'user', parts: [{ text: `Speak with clinical empathy and deep warmth: ${text}` }] }],
+        contents: [{ role: 'user', parts: [{ text: `Deep clinical warmth: ${text}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -122,15 +122,13 @@ export class GeminiService {
         },
       });
       const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      return data ? this.decodeBase64(data) : null;
+      if (!data) return null;
+      
+      const bin = atob(data);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes;
     } catch { return null; }
-  }
-
-  private decodeBase64(b64: string): Uint8Array {
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return bytes;
   }
 }
 
