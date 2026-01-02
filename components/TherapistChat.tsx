@@ -147,12 +147,11 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
 
       setMessages(prev => [...prev, assistantMsg]);
 
-      // Trigger blueprint update every few messages to keep it fresh
-      if (messages.length >= 2 && messages.length % 2 === 0) {
+      if (messages.length >= 2) {
         updateBlueprint([...messages, userMsg, assistantMsg]);
       }
     } catch (err) {
-      setError("I'm momentarily disconnected from my restorative core. Please try again.");
+      setError("I'm having trouble connecting to my restorative core. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -173,7 +172,6 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
 
   return (
     <div className="flex flex-col h-[80vh] glass-panel rounded-[2rem] shadow-2xl overflow-hidden relative border border-white/40">
-      {/* Header */}
       <div className="px-8 py-4 bg-white/50 backdrop-blur-md border-b border-white/20 flex justify-between items-center z-20">
         <div className="flex items-center gap-3">
           <div className={`w-2 h-2 rounded-full ${mode === SessionMode.DEEP ? 'bg-indigo-600 animate-pulse' : 'bg-green-500'}`}></div>
@@ -193,11 +191,7 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
         )}
       </div>
 
-      {/* Messages */}
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto px-6 py-8 space-y-8 custom-scrollbar"
-      >
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-8 space-y-8 custom-scrollbar">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fade-in-up`}>
             {msg.thinking && (
@@ -215,9 +209,6 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
             }`}>
               <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
             </div>
-            <span className="mt-2 text-[9px] font-bold text-zen-300 uppercase tracking-tighter">
-              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
           </div>
         ))}
 
@@ -228,18 +219,17 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
               <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
               <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
             </div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Formulating Advice...</span>
           </div>
         )}
 
         {error && (
-          <div className="text-center py-4 px-6 bg-red-50 text-red-600 rounded-xl text-xs font-bold border border-red-100">
-            {error}
+          <div className="flex items-center gap-4 bg-white/90 p-6 rounded-3xl border border-red-100 shadow-xl text-red-600 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-2">
+            <i className="fa-solid fa-triangle-exclamation text-xl"></i>
+            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-center flex-1">{error}</span>
           </div>
         )}
       </div>
 
-      {/* Input */}
       <div className="p-6 bg-white/30 backdrop-blur-xl border-t border-white/20">
         <div className="max-w-4xl mx-auto flex items-center gap-3 bg-white p-2 rounded-full shadow-xl border border-zen-50">
           <button 
