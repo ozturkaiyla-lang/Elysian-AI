@@ -5,10 +5,9 @@ export class GeminiService {
   private getAI() {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      console.error("API_KEY is not defined in the environment.");
+      console.error("API_KEY is not defined.");
       throw new Error("API_KEY_MISSING");
     }
-    // Create fresh instance to ensure connectivity
     return new GoogleGenAI({ apiKey });
   }
 
@@ -29,9 +28,9 @@ export class GeminiService {
       const systemInstruction = `You are Elysian, a world-class AI emotional therapist. 
         Your tone is empathetic, professional, gentle, and deeply insightful. 
         ${namePart}${focusPart}${contextPart}
-        You specialize in healing broken relationships, providing marriage counseling, and helping users find happiness in difficult life transitions.
-        When mode is DEEP, you provide profound, analytical psychological insights.
-        When providing advice, be actionable but non-judgmental. Always address the user warmly.`;
+        You specialize in healing relationships, marriage counseling, and helping users find happiness.
+        When mode is DEEP, provide profound, analytical psychological insights.
+        Be actionable but non-judgmental.`;
 
       const contents = [
         ...history.map(h => ({
@@ -56,7 +55,7 @@ export class GeminiService {
       });
 
       if (!response || !response.text) {
-        throw new Error("I apologize, but I couldn't form a response. Please try sharing your thoughts again.");
+        throw new Error("I couldn't form a response. Please try again.");
       }
 
       return {
@@ -65,15 +64,6 @@ export class GeminiService {
       };
     } catch (error: any) {
       console.error("Gemini API Error:", error);
-      // Catch common key/connection errors
-      if (
-        error.message?.includes("API_KEY_MISSING") || 
-        error.message?.includes("403") || 
-        error.message?.includes("not found") ||
-        error.message?.includes("API key")
-      ) {
-        throw new Error("KEY_RESET_REQUIRED");
-      }
       throw error;
     }
   }
@@ -100,7 +90,7 @@ export class GeminiService {
       }
       return null;
     } catch (error) {
-      console.error("TTS generation failed", error);
+      console.error("TTS failed", error);
       return null;
     }
   }
@@ -124,7 +114,7 @@ export class GeminiService {
       source.connect(ctx.destination);
       source.start();
     } catch (e) {
-      console.error("Audio playback error:", e);
+      console.error("Playback error:", e);
     }
   }
 

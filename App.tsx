@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { SessionMode, UserProfile } from './types';
 import TherapistChat from './components/TherapistChat';
 import AdviceHub from './components/AdviceHub';
@@ -32,7 +33,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
           <Link 
             to="/session" 
-            className="bg-black text-white px-10 py-4.5 rounded-full text-[11px] font-black uppercase tracking-[0.3em] hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] hover:-translate-y-1 transition-all active:scale-95"
+            className="bg-black text-white px-10 py-4 rounded-full text-[11px] font-black uppercase tracking-[0.3em] hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] hover:-translate-y-1 transition-all active:scale-95"
           >
             Start Healing
           </Link>
@@ -64,6 +65,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const Home: React.FC = () => {
+  const navigate = useNavigate();
   return (
     <div className="space-y-40 pb-20">
       <header className="text-center py-24 px-6">
@@ -71,4 +73,109 @@ const Home: React.FC = () => {
           <span className="w-2 h-2 rounded-full bg-black mr-4 animate-pulse"></span>
           Intelligent Emotional Support
         </div>
-        <h1 className="text-7xl md:text-9xl font-serif font-bold text-black mb-14 leading-[1] tracking-
+        <h1 className="text-7xl md:text-9xl font-serif font-bold text-black mb-14 leading-[1] tracking-tighter">
+          Heal your <br/>
+          <span className="italic font-normal">inner world.</span>
+        </h1>
+        <p className="text-xl md:text-2xl text-black/60 max-w-2xl mx-auto mb-20 leading-relaxed font-medium">
+          A sanctuary for profound reflection. Elysian uses advanced neural intelligence to provide the empathetic, deep support you deserve.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
+          <Link 
+            to="/session" 
+            className="bg-black text-white px-12 py-6 rounded-full text-[12px] font-black uppercase tracking-[0.4em] shadow-2xl hover:-translate-y-2 transition-all active:scale-95"
+          >
+            Begin Your Journey
+          </Link>
+          <a 
+            href="#advice" 
+            className="bg-white text-black px-12 py-6 rounded-full text-[12px] font-black uppercase tracking-[0.4em] border border-black/5 hover:bg-black/5 transition-all"
+          >
+            Explore Wisdom
+          </a>
+        </div>
+      </header>
+
+      <section id="advice" className="px-6 py-20">
+        <div className="text-center mb-24">
+          <h2 className="text-[11px] font-black uppercase tracking-[0.5em] text-black/30 mb-6">Restorative Frameworks</h2>
+          <h3 className="text-5xl font-serif font-bold text-black">Common Paths to Clarity</h3>
+        </div>
+        <AdviceHub onSelectPrompt={() => {
+          navigate('/session');
+        }} />
+      </section>
+    </div>
+  );
+};
+
+const Session: React.FC<{ profile?: UserProfile }> = ({ profile }) => {
+  const [mode, setMode] = useState<SessionMode>(SessionMode.FAST);
+  const [isStarted, setIsStarted] = useState(false);
+
+  if (!isStarted) {
+    return (
+      <div className="space-y-12">
+        <div className="flex flex-col items-center text-center space-y-6">
+          <h2 className="text-4xl font-serif font-bold text-black tracking-tight">Select Session Intensity</h2>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => setMode(SessionMode.FAST)}
+              className={`px-8 py-4 rounded-full text-[11px] font-black uppercase tracking-widest transition-all ${mode === SessionMode.FAST ? 'bg-black text-white shadow-xl' : 'bg-white text-black/40 border border-black/5'}`}
+            >
+              Mindful Check-in
+            </button>
+            <button 
+              onClick={() => setMode(SessionMode.DEEP)}
+              className={`px-8 py-4 rounded-full text-[11px] font-black uppercase tracking-widest transition-all ${mode === SessionMode.DEEP ? 'bg-black text-white shadow-xl' : 'bg-white text-black/40 border border-black/5'}`}
+            >
+              Deep Resonance
+            </button>
+          </div>
+        </div>
+        <AdviceHub onSelectPrompt={() => setIsStarted(true)} />
+        <div className="text-center">
+            <button 
+              onClick={() => setIsStarted(true)}
+              className="bg-black text-white px-12 py-6 rounded-full text-[12px] font-black uppercase tracking-[0.4em] shadow-2xl hover:-translate-y-1 transition-all"
+            >
+              Begin Session
+            </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <TherapistChat mode={mode} profile={profile} />;
+};
+
+const App: React.FC = () => {
+  const [profile, setProfile] = useState<UserProfile | undefined>(() => {
+    const saved = localStorage.getItem('elysian_profile');
+    return saved ? JSON.parse(saved) : undefined;
+  });
+
+  const handleProfileComplete = (newProfile: UserProfile) => {
+    setProfile(newProfile);
+    localStorage.setItem('elysian_profile', JSON.stringify(newProfile));
+  };
+
+  return (
+    <Router>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/session" element={
+            !profile ? (
+              <ProfileSetup onComplete={handleProfileComplete} />
+            ) : (
+              <Session profile={profile} />
+            )
+          } />
+        </Routes>
+      </Layout>
+    </Router>
+  );
+};
+
+export default App;

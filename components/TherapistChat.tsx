@@ -200,13 +200,8 @@ const TherapistChat: React.FC<TherapistChatProps> = ({ mode, profile }) => {
       setMessages(prev => [...prev, assistantMessage]);
     } catch (err: any) {
       console.error("Chat Send Error:", err);
-      if (err.message === "KEY_RESET_REQUIRED") {
-        setError("Connection required for deep reflection. Opening setup...");
-        if ((window as any).aistudio?.openSelectKey) {
-          await (window as any).aistudio.openSelectKey();
-          // Instructions: assume key selection successful and guide user to try again
-          setError("Configuration updated. Please try your message one more time.");
-        }
+      if (err.message === "KEY_RESET_REQUIRED" || err.message?.includes("API_KEY_MISSING")) {
+        setError("Healing connection interrupted. Please ensure your API Key is correctly configured in Vercel environment variables.");
       } else {
         setError("I'm having trouble connecting to my restorative core. Please check your internet and try again.");
       }
