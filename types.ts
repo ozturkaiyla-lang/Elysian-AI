@@ -26,3 +26,17 @@ export interface UserProfile {
   context?: string;
   mainFocus?: string;
 }
+
+export interface BlueprintStep {
+  title: string;
+  description: string;
+  whyItWorks: string;
+}
+
+export interface RestorationBlueprint {
+  rootAnalysis: string;
+  coreShift: string;
+  actionSteps: BlueprintStep[];
+  suggestedRitual: string;
+  lastUpdated: number;
+}

@@ -1,11 +1,11 @@
-import { GoogleGenAI, Modality, Type, GenerateContentResponse } from "@google/genai";
-import { UserProfile } from "../types";
+import { GoogleGenAI, Modality, Type } from "@google/genai";
+import { UserProfile, RestorationBlueprint } from "../types";
 
 export class GeminiService {
   private getAI() {
+    // process.env.API_KEY is defined in vite.config.ts
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      console.error("API_KEY is not defined.");
       throw new Error("API_KEY_MISSING");
     }
     return new GoogleGenAI({ apiKey });
@@ -17,55 +17,82 @@ export class GeminiService {
     mode: 'FAST' | 'DEEP',
     profile?: UserProfile
   ): Promise<{ text: string; thinking?: string }> {
-    try {
-      const ai = this.getAI();
-      const model = mode === 'DEEP' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
-      
-      const namePart = profile?.name ? `The user's name is ${profile.name}. ` : "";
-      const focusPart = profile?.mainFocus ? `Their primary concern today is: ${profile.mainFocus}. ` : "";
-      const contextPart = profile?.context ? `Additional Context: ${profile.context}. ` : "";
+    const ai = this.getAI();
+    const model = mode === 'DEEP' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+    
+    const sys = `You are Elysian, an elite AI emotional therapist. 
+      Tone: Gentle, authoritative on psychology, deeply empathetic, but most importantly: ACTION-ORIENTED.
+      Objective: Provide ADVICE and INTELLIGENT SUGGESTIONS on how to FIX the user's emotional or relationship state.
+      Context: User name is ${profile?.name || 'User'}. Focus: ${profile?.mainFocus || 'Mental Well-being'}. ${profile?.context ? `Context: ${profile.context}` : ''}`;
 
-      const systemInstruction = `You are Elysian, a world-class AI emotional therapist. 
-        Your tone is empathetic, professional, gentle, and deeply insightful. 
-        ${namePart}${focusPart}${contextPart}
-        You specialize in healing relationships, marriage counseling, and helping users find happiness.
-        When mode is DEEP, provide profound, analytical psychological insights.
-        Be actionable but non-judgmental.`;
+    const contents = [
+      ...history.map(h => ({
+        role: h.role === 'user' ? 'user' : 'model' as any,
+        parts: [{ text: h.content }]
+      })),
+      { role: 'user', parts: [{ text: message }] }
+    ];
 
-      const contents = [
-        ...history.map(h => ({
-          role: h.role === 'user' ? 'user' : 'model',
-          parts: [{ text: h.content }]
-        })),
-        { role: 'user', parts: [{ text: message }] }
-      ];
-
-      const config: any = {
-        systemInstruction,
-      };
-
-      if (mode === 'DEEP') {
-        config.thinkingConfig = { thinkingBudget: 32768 };
-      }
-
-      const response = await ai.models.generateContent({
-        model,
-        contents,
-        config,
-      });
-
-      if (!response || !response.text) {
-        throw new Error("I couldn't form a response. Please try again.");
-      }
-
-      return {
-        text: response.text,
-        thinking: (response as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought
-      };
-    } catch (error: any) {
-      console.error("Gemini API Error:", error);
-      throw error;
+    const config: any = { systemInstruction: sys };
+    if (mode === 'DEEP') {
+      config.thinkingConfig = { thinkingBudget: 16000 };
     }
+
+    const response = await ai.models.generateContent({
+      model,
+      contents,
+      config,
+    });
+
+    const thought = (response as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought;
+    
+    return {
+      text: response.text || "I'm reflecting deeply on that. Can you tell me more?",
+      thinking: thought
+    };
+  }
+
+  async generateBlueprint(
+    history: { role: 'user' | 'assistant', content: string }[],
+    profile?: UserProfile
+  ): Promise<RestorationBlueprint> {
+    const ai = this.getAI();
+    const prompt = `Based on our therapeutic session, create a "Restoration Blueprint" JSON. 
+      Focus on INTELLIGENT SUGGESTIONS to FIX the situation.
+      Conversation Summary: ${history.map(h => h.content).slice(-10).join(' ')}
+      User Profile: ${JSON.stringify(profile)}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            rootAnalysis: { type: Type.STRING },
+            coreShift: { type: Type.STRING },
+            actionSteps: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  whyItWorks: { type: Type.STRING }
+                },
+                required: ['title', 'description', 'whyItWorks']
+              }
+            },
+            suggestedRitual: { type: Type.STRING }
+          },
+          required: ['rootAnalysis', 'coreShift', 'actionSteps', 'suggestedRitual']
+        }
+      }
+    });
+
+    const blueprint = JSON.parse(response.text || '{}');
+    return { ...blueprint, lastUpdated: Date.now() };
   }
 
   async generateTTS(text: string): Promise<Uint8Array | null> {
@@ -73,68 +100,24 @@ export class GeminiService {
       const ai = this.getAI();
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Say with deep, gentle empathy: ${text}` }] }],
+        contents: [{ parts: [{ text: `Say with deep empathy: ${text}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
         },
       });
-
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) {
-        return this.decodeBase64(base64Audio);
-      }
-      return null;
-    } catch (error) {
-      console.error("TTS failed", error);
-      return null;
-    }
+      const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      return data ? this.decodeBase64(data) : null;
+    } catch { return null; }
   }
 
-  private decodeBase64(base64: string): Uint8Array {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
+  private decodeBase64(b64: string): Uint8Array {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     return bytes;
-  }
-
-  async playAudio(data: Uint8Array) {
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      const audioBuffer = await this.decodeAudioData(data, ctx, 24000, 1);
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      source.start();
-    } catch (e) {
-      console.error("Playback error:", e);
-    }
-  }
-
-  private async decodeAudioData(
-    data: Uint8Array,
-    ctx: AudioContext,
-    sampleRate: number,
-    numChannels: number,
-  ): Promise<AudioBuffer> {
-    const dataInt16 = new Int16Array(data.buffer);
-    const frameCount = dataInt16.length / numChannels;
-    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-    for (let channel = 0; channel < numChannels; channel++) {
-      const channelData = buffer.getChannelData(channel);
-      for (let i = 0; i < frameCount; i++) {
-        channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-      }
-    }
-    return buffer;
   }
 }
 
